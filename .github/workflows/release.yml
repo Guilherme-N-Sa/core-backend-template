@@ -1,0 +1,64 @@
+name: release
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check branch name and create release
+        id: release
+        run: |
+          BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+
+          if [[ $BRANCH_NAME =~ ^(major|breaking|feature|minor|chore|fix|patch|hotfix|bugfix|dependency|deps)/ ]]; then
+            echo "VALID_BRANCH=true" >> $GITHUB_ENV
+
+            # Get latest tag
+            git fetch --tags
+            LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null || echo "v0.0.0")
+            echo "LATEST_TAG=${LATEST_TAG}" >> $GITHUB_ENV
+
+            CURRENT_VERSION=${LATEST_TAG#v}
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+
+            if [[ $BRANCH_NAME =~ ^(major|breaking)/ ]]; then
+              NEW_VERSION="$((MAJOR + 1)).0.0"
+            elif [[ $BRANCH_NAME =~ ^(feature|minor|chore)/ ]]; then
+              NEW_VERSION="${MAJOR}.$((MINOR + 1)).0"
+            elif [[ $BRANCH_NAME =~ ^(fix|patch|hotfix|bugfix|dependency|deps)/ ]]; then
+              NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+            fi
+
+            echo "NEW_VERSION=v${NEW_VERSION}" >> $GITHUB_ENV
+            echo "New version will be: v${NEW_VERSION}"
+          else
+            echo "VALID_BRANCH=false" >> $GITHUB_ENV
+            echo "Branch name does not match required prefixes. Skipping release creation."
+          fi
+
+      - name: Create Release
+        if: env.VALID_BRANCH == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          git tag ${{ env.NEW_VERSION }}
+          git push origin ${{ env.NEW_VERSION }} --force
+
+          gh release create ${{ env.NEW_VERSION }} \
+            --title "Release ${{ env.NEW_VERSION }}" \
+            --notes "Changes in this Release
+            - Merged PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}"

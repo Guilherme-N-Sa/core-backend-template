@@ -1,0 +1,65 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+docker-compose.yml
+.docker
+.dockerignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Virtual Environment
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Project
+media/
+*.sqlite3
+*.log
+*.pot
+*.pyc
+
+# Documentation
+docs/
+README.md
+CHANGELOG.md
+LICENSE
+
+# Tests
+tests/
+test/
+*/tests/
+pytest.ini
+
+# Poetry
+poetry.toml
+
+# Development
+.editorconfig
+.flake8
+.pre-commit-config.yaml
+mypy.ini
+pytest.ini
+tox.ini

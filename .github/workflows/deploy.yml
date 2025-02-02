@@ -1,0 +1,76 @@
+name: deploy
+
+on:
+  workflow_run:
+    workflows:
+      - release
+    types:
+      - completed
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: dev-env/main-backend
+  ECR_REGISTRY: 715384577671.dkr.ecr.us-east-1.amazonaws.com
+  LIGHTSAIL_USER: ubuntu
+  LIGHTSAIL_IP: 44.196.215.34
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Get latest tag
+        run: |
+          git fetch --tags
+          LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+          echo "IMAGE_TAG=${LATEST_TAG}" >> $GITHUB_ENV
+
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to server
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          IMAGE_TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            docker-compose.dev.yml ${{ env.LIGHTSAIL_USER }}@${{ env.LIGHTSAIL_IP }}:/home/ubuntu/docker-compose.yml
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            makefile ${{ env.LIGHTSAIL_USER }}@${{ env.LIGHTSAIL_IP }}:/home/ubuntu/makefile
+
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ env.LIGHTSAIL_USER }}@${{ env.LIGHTSAIL_IP }} '
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
+            docker-compose down
+            docker image prune -f
+            docker-compose pull
+            docker-compose up -d
+          '

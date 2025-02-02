@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "core-backend"
+version = "0.1.0"
+description = "core default backend"
+authors = ["Guilherme Niclewicz"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+django = "^5.0"
+prettyconf = "^2.2.1"
+djangorestframework = "^3.14.0"
+psycopg2-binary = "^2.9.9"
+dj-database-url = "^2.3.0"
+uvicorn = {extras = ["standard"], version = "^0.34.0"}
+openai = "^1.12.0"
+django-cors-headers = "^4.6.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.1.1"
+isort = "^5.13.2"
+flake8 = "^7.0.0"
+pre-commit = "^3.6.0"
+jupyter = "^1.1.1"
+openai = "^1.59.8"
+prettyconf = "^2.2.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
